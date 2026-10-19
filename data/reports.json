@@ -1,0 +1,19 @@
+[
+  {
+    "date": "2026-10-19",
+    "khoi": "Khối 10",
+    "lop": "10A2",
+    "siSo": 40,
+    "tong": 40,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 40,
+        "reason": ""
+      }
+    ],
+    "createdBy": "HoangThiLien",
+    "time": "2026-10-19T17:35:28.356Z"
+  }
+]
