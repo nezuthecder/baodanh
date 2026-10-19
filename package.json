@@ -1,0 +1,7 @@
+{
+  "name": "diemdanh",
+  "version": "1.0.0",
+  "description": "Bảng điểm danh học sinh theo khối / lớp",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" }
+}
