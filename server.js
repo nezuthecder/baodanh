@@ -9,8 +9,9 @@ const UPLOADS = path.join(__dirname, 'uploads');
 const CLASSES_FILE = path.join(DATA, 'classes.json');
 const REPORTS_FILE = path.join(DATA, 'reports.json');
 const USERS_FILE = path.join(DATA, 'users.json');
+const SESSIONS_FILE = path.join(DATA, 'sessions.json');
 const sessions = new Map();
-const SESSION_TTL = 12 * 60 * 60 * 1000;
+const SESSION_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60;
 const PASSWORD_BYTES = 64;
 
 fs.mkdirSync(DATA, { recursive: true });
@@ -71,12 +72,9 @@ function initializeUsers() {
 function userFromRequest(req) {
   const match = (req.headers.cookie || '').match(/(?:^|;\s*)sid=([a-f0-9]+)/);
   if (!match) return null;
-  const session = sessions.get(match[1]);
-  if (!session || session.expiresAt <= Date.now()) {
-    sessions.delete(match[1]);
-    return null;
-  }
-  return session.user;
+  const key = sessionKey(match[1]);
+  const session = sessions.get(key);
+  return session ? session.user : null;
 }
 
 function requireUser(req, res, adminOnly = false) {
@@ -113,6 +111,42 @@ function safeUser(user) {
   return { id: user.id, username: user.username, role: user.role };
 }
 
+function sessionKey(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function persistSessions() {
+  writeJSON(SESSIONS_FILE, Array.from(sessions, ([key, session]) => ({
+    key,
+    user: session.user,
+  })));
+}
+
+function initializeSessions() {
+  if (!fs.existsSync(SESSIONS_FILE)) {
+    persistSessions();
+    return;
+  }
+  const savedSessions = readJSON(SESSIONS_FILE);
+  if (!Array.isArray(savedSessions)) {
+    throw new Error('data/sessions.json phải là danh sách phiên đăng nhập hợp lệ.');
+  }
+  const usersById = new Map(readJSON(USERS_FILE).map((user) => [user.id, user]));
+  let removedInvalid = false;
+  for (const saved of savedSessions) {
+    if (!saved || typeof saved.key !== 'string' || !/^[a-f0-9]{64}$/.test(saved.key)) {
+      throw new Error('data/sessions.json chứa phiên đăng nhập không hợp lệ.');
+    }
+    const user = usersById.get(saved.user && saved.user.id);
+    if (!user) {
+      removedInvalid = true;
+      continue;
+    }
+    sessions.set(saved.key, { user: safeUser(user) });
+  }
+  if (removedInvalid || savedSessions.some((saved) => Object.prototype.hasOwnProperty.call(saved, 'expiresAt'))) persistSessions();
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
@@ -128,13 +162,11 @@ const server = http.createServer(async (req, res) => {
       }
       const token = crypto.randomBytes(32).toString('hex');
       const safe = safeUser(user);
-      for (const [existingToken, session] of sessions) {
-        if (session.expiresAt <= Date.now()) sessions.delete(existingToken);
-      }
-      sessions.set(token, { user: safe, expiresAt: Date.now() + SESSION_TTL });
+      sessions.set(sessionKey(token), { user: safe });
+      persistSessions();
       const secureCookie = process.env.NODE_ENV === 'production' ? '; Secure' : '';
       return send(res, 200, { user: safe }, {
-        'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL / 1000}${secureCookie}`,
+        'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_COOKIE_MAX_AGE}${secureCookie}`,
       });
     } catch (error) {
       return send(res, 400, { error: error.message });
@@ -143,7 +175,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/logout') {
     const match = (req.headers.cookie || '').match(/(?:^|;\s*)sid=([a-f0-9]+)/);
-    if (match) sessions.delete(match[1]);
+    if (match && sessions.delete(sessionKey(match[1]))) persistSessions();
     return send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
   }
 
@@ -259,9 +291,14 @@ const server = http.createServer(async (req, res) => {
       if (target.role !== 'teacher') return send(res, 403, { error: 'Chỉ có thể đặt lại mật khẩu tài khoản giáo viên' });
       Object.assign(target, hashPassword(password));
       saveUsers(users);
+      let removedSessions = false;
       for (const [token, session] of sessions) {
-        if (session.user.id === target.id) sessions.delete(token);
+        if (session.user.id === target.id) {
+          sessions.delete(token);
+          removedSessions = true;
+        }
       }
+      if (removedSessions) persistSessions();
       return send(res, 200, { ok: true });
     } catch (error) {
       return send(res, 400, { error: error.message });
@@ -276,9 +313,14 @@ const server = http.createServer(async (req, res) => {
     if (!target) return send(res, 404, { error: 'Không tìm thấy tài khoản' });
     if (target.role === 'admin') return send(res, 403, { error: 'Không thể xóa tài khoản admin' });
     saveUsers(users.filter((candidate) => candidate.id !== target.id));
+    let removedSessions = false;
     for (const [token, session] of sessions) {
-      if (session.user.id === target.id) sessions.delete(token);
+      if (session.user.id === target.id) {
+        sessions.delete(token);
+        removedSessions = true;
+      }
     }
+    if (removedSessions) persistSessions();
     return send(res, 200, { ok: true });
   }
 
@@ -353,11 +395,15 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname.startsWith('/uploads/')) {
     return serveFile(res, path.join(UPLOADS, path.basename(url.pathname)));
   }
+  if (req.method === 'GET' && url.pathname === '/service-worker.js') {
+    return serveFile(res, path.join(__dirname, 'public', 'service-worker.js'));
+  }
   serveFile(res, path.join(__dirname, 'public', 'index.html'));
 });
 
 try {
   initializeUsers();
+  initializeSessions();
 } catch (error) {
   console.error(error.message);
   process.exit(1);
