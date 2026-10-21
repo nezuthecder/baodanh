@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bảng điểm danh học sinh</title>
 <style>
   :root { --bg:#f4f6fa; --card:#fff; --text:#1d2433; --muted:#667085; --line:#e3e7ef; --ok:#12a150; --bad:#d92d20; --pri:#2858d6; }
@@ -57,6 +57,59 @@
   .admin-panel { margin-bottom:18px; }
   .user-list { display:grid; gap:8px; }
   .user-entry { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  input[type=checkbox] { accent-color:var(--pri); }
+  button:focus-visible, input:focus-visible { outline:3px solid color-mix(in srgb, var(--pri) 45%, transparent); outline-offset:2px; }
+  @media (max-width:600px) {
+    body {
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      overflow-x:hidden;
+    }
+    header { align-items:stretch; gap:10px; margin-bottom:12px; }
+    h1 { flex:1 1 100%; font-size:clamp(19px, 5vw, 22px); }
+    header > div:last-child { width:100%; }
+    header > div:last-child label { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    header input[type=date] { min-width:0; flex:1; }
+    .account { width:100%; justify-content:space-between; }
+    .grid { grid-template-columns:minmax(0, 1fr); gap:10px; }
+    .card { min-width:0; padding:12px; border-radius:10px; }
+    .tabs {
+      flex-wrap:nowrap;
+      justify-content:flex-start;
+      overflow-x:auto;
+      overscroll-behavior-x:contain;
+      scrollbar-width:thin;
+      padding:2px 1px 8px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .tab { flex:0 0 auto; }
+    .row { gap:8px; }
+    .row label { min-width:0; }
+    .row label input[type=checkbox] { width:20px; height:20px; flex:none; }
+    input[type=number], input[type=text], input[type=date],
+    .auth input, .user-form input { min-height:44px; font-size:16px; }
+    input[type=number] { width:88px; }
+    .head { align-items:flex-start; gap:8px; }
+    .head > .muted { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px; }
+    .head .siso { width:76px !important; }
+    button { min-height:44px; padding:10px 12px; }
+    .password-toggle { min-width:76px; }
+    .pager { gap:6px; }
+    .pager button { flex:1; padding:9px 6px; }
+    .pager .muted { flex:none; text-align:center; }
+    .auth { margin:20px auto; }
+    .user-entry { align-items:flex-start; flex-wrap:wrap; }
+    .user-entry > span:last-child { display:flex; flex-wrap:wrap; gap:6px; }
+    .user-entry button { padding:8px 10px; }
+  }
+  @media (max-width:360px) {
+    body { padding-left:max(8px, env(safe-area-inset-left)); padding-right:max(8px, env(safe-area-inset-right)); }
+    .card { padding:10px; }
+    .row label { font-size:13px; }
+    .total { gap:6px; padding:8px; font-size:14px; }
+    .pager { flex-wrap:wrap; }
+    .pager .muted { order:-1; width:100%; }
+  }
 </style>
 </head>
 <body>
