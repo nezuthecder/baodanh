@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bảng điểm danh học sinh</title>
+<style>
+  :root { --bg:#f4f6fa; --card:#fff; --text:#1d2433; --muted:#667085; --line:#e3e7ef; --ok:#12a150; --bad:#d92d20; --pri:#2858d6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151c; --card:#1b2029; --text:#e8ecf4; --muted:#98a2b3; --line:#2c3341; --pri:#6f95ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); padding:16px; }
+  header { max-width:1200px; margin:0 auto 16px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+  h1 { font-size:22px; margin:0; }
+  h2 { margin:24px 0 10px; font-size:18px; border-left:4px solid var(--pri); padding-left:10px; }
+  main { max-width:1200px; margin:0 auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .card.done { border-color:var(--ok); }
+  .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .head b { font-size:17px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .row { display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid var(--line); flex-wrap:wrap; }
+  .row label { flex:1; min-width:150px; display:flex; gap:8px; align-items:center; cursor:pointer; font-size:14px; }
+  input[type=number] { width:80px; }
+  input[type=number], input[type=text], input[type=date] { padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font:inherit; }
+  .reason { width:100%; }
+  .hidden { display:none !important; }
+  .total { margin-top:10px; padding:8px 10px; border-radius:8px; font-weight:600; display:flex; justify-content:space-between; }
+  .total.red { background:rgba(217,45,32,.12); color:var(--bad); }
+  .total.green { background:rgba(18,161,80,.14); color:var(--ok); }
+  button { font:inherit; border:0; border-radius:8px; padding:9px 14px; cursor:pointer; background:var(--pri); color:#fff; font-weight:600; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+  .submit { width:100%; margin-top:10px; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:12px; z-index:10; }
+  .modal > div { background:var(--card); border-radius:14px; padding:18px; width:min(560px,100%); max-height:92vh; overflow:auto; }
+  .item { border:1px solid var(--line); border-radius:10px; padding:10px; margin:10px 0; }
+  .item img, .thumbs img { max-width:100%; max-height:160px; border-radius:8px; margin-top:8px; display:block; }
+  .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  #cards { max-width:640px; margin:0 auto; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin:10px 0; }
+  .tab { background:var(--card); color:var(--text); border:1px solid var(--line); padding:8px 14px; }
+  .tab.on { background:var(--pri); color:#fff; border-color:var(--pri); }
+  .tab.okTab:not(.on) { border-color:var(--ok); color:var(--ok); }
+  .pager { max-width:640px; margin:14px auto; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .badge { font-size:12px; padding:2px 8px; border-radius:99px; background:rgba(18,161,80,.15); color:var(--ok); }
+  .auth { max-width:420px; margin:40px auto; }
+  .auth h2 { margin-top:0; }
+  .auth form, .user-form { display:grid; gap:10px; }
+  .auth input, .user-form input { width:100%; padding:9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font:inherit; }
+  .password-field { display:flex; gap:6px; margin-top:4px; }
+  .password-field input { margin:0; }
+  .password-toggle { flex:none; min-width:76px; padding:6px 10px; }
+  .account { display:flex; align-items:center; gap:10px; }
+  .admin-panel { margin-bottom:18px; }
+  .user-list { display:grid; gap:8px; }
+  .user-entry { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  input[type=checkbox] { accent-color:var(--pri); }
+  button:focus-visible, input:focus-visible { outline:3px solid color-mix(in srgb, var(--pri) 45%, transparent); outline-offset:2px; }
+  @media (max-width:600px) {
+    body {
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      overflow-x:hidden;
+    }
+    header { align-items:stretch; gap:10px; margin-bottom:12px; }
+    h1 { flex:1 1 100%; font-size:clamp(19px, 5vw, 22px); }
+    header > div:last-child { width:100%; }
+    header > div:last-child label { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    header input[type=date] { min-width:0; flex:1; }
+    .account { width:100%; justify-content:space-between; }
+    .grid { grid-template-columns:minmax(0, 1fr); gap:10px; }
+    .card { min-width:0; padding:12px; border-radius:10px; }
+    .tabs {
+      flex-wrap:nowrap;
+      justify-content:flex-start;
+      overflow-x:auto;
+      overscroll-behavior-x:contain;
+      scrollbar-width:thin;
+      padding:2px 1px 8px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .tab { flex:0 0 auto; }
+    .row { gap:8px; }
+    .row label { min-width:0; }
+    .row label input[type=checkbox] { width:20px; height:20px; flex:none; }
+    input[type=number], input[type=text], input[type=date],
+    .auth input, .user-form input { min-height:44px; font-size:16px; }
+    input[type=number] { width:88px; }
+    .head { align-items:flex-start; gap:8px; }
+    .head > .muted { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px; }
+    .head .siso { width:76px !important; }
+    button { min-height:44px; padding:10px 12px; }
+    .password-toggle { min-width:76px; }
+    .pager { gap:6px; }
+    .pager button { flex:1; padding:9px 6px; }
+    .pager .muted { flex:none; text-align:center; }
+    .auth { margin:20px auto; }
+    .user-entry { align-items:flex-start; flex-wrap:wrap; }
+    .user-entry > span:last-child { display:flex; flex-wrap:wrap; gap:6px; }
+    .user-entry button { padding:8px 10px; }
+  }
+  @media (max-width:360px) {
+    body { padding-left:max(8px, env(safe-area-inset-left)); padding-right:max(8px, env(safe-area-inset-right)); }
+    .card { padding:10px; }
+    .row label { font-size:13px; }
+    .total { gap:6px; padding:8px; font-size:14px; }
+    .pager { flex-wrap:wrap; }
+    .pager .muted { order:-1; width:100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Bảng điểm danh học sinh</h1>
+  <div class="account hidden" id="account">
+    <span class="muted" id="accountName"></span>
+    <button class="ghost" id="logout">Đăng xuất</button>
+  </div>
+  <div><label class="muted">Ngày: <input type="date" id="date"></label></div>
+</header>
+<main>
+  <section class="card auth hidden" id="loginPanel">
+    <h2>Đăng nhập</h2>
+    <form id="loginForm">
+      <label>Tên đăng nhập<input name="username" autocomplete="username" required></label>
+      <label>Mật khẩu
+        <span class="password-field">
+          <input name="password" type="password" autocomplete="current-password" required>
+          <button class="ghost password-toggle" type="button" aria-label="Hiện mật khẩu" aria-pressed="false">Hiện</button>
+        </span>
+      </label>
+      <button>Đăng nhập</button>
+      <div class="muted" id="loginError" role="alert"></div>
+    </form>
+  </section>
+  <div id="app" class="hidden"></div>
+</main>
+
+
+<script>
+const ROWS = [
+  ['lop', 'Học sinh trên lớp'], ['thuvien', 'Học sinh thư viện'], ['on', 'Học sinh đi ôn'],
+  ['ktx', 'Học sinh dưới KTX giáo viên'], ['ngoai', 'Học sinh ra ngoài'], ['ve', 'Học sinh về'], ['khac', 'Khác'],
+];
+const state = {};   // state[lop][key] = {on, qty, reason}
+let classes = [], reports = [], currentUser = null, users = [];
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+$('#date').value = new Date().toISOString().slice(0, 10);
+$('#date').onchange = () => { Object.keys(state).forEach((k) => delete state[k]); load(); };
+
+async function load() {
+  if (!currentUser) return;
+  try {
+    const [classRes, reportRes] = await Promise.all([
+      fetch('/api/classes'),
+      fetch('/api/reports?date=' + encodeURIComponent($('#date').value)),
+    ]);
+    if (!classRes.ok || !reportRes.ok) throw new Error('Không tải được dữ liệu điểm danh');
+    classes = await classRes.json();
+    reports = await reportRes.json();
+    if (currentUser.role === 'admin') {
+      const usersRes = await fetch('/api/users');
+      if (!usersRes.ok) throw new Error('Không tải được danh sách tài khoản');
+      users = await usersRes.json();
+    }
+    render();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function setUser(user) {
+  currentUser = user;
+  $('#loginPanel').classList.toggle('hidden', !!user);
+  $('#app').classList.toggle('hidden', !user);
+  $('#account').classList.toggle('hidden', !user);
+  $('#accountName').textContent = user ? `${user.username} (${user.role === 'admin' ? 'admin' : 'giáo viên trực'})` : '';
+}
+
+$('#loginForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  $('#loginError').textContent = '';
+  const loginForm = event.currentTarget;
+  const form = new FormData(loginForm);
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: form.get('username'), password: form.get('password') }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Đăng nhập thất bại');
+    loginForm.reset();
+    setUser(result.user);
+    await load();
+  } catch (error) {
+    $('#loginError').textContent = error.message;
+  }
+});
+
+$('#logout').addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' });
+  setUser(null);
+  users = [];
+  classes = [];
+  reports = [];
+  $('#app').innerHTML = '';
+});
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.password-toggle');
+  if (!button) return;
+  const input = button.parentElement.querySelector('input');
+  const visible = input.type === 'password';
+  input.type = visible ? 'text' : 'password';
+  button.textContent = visible ? 'Ẩn' : 'Hiện';
+  button.setAttribute('aria-label', visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+  button.setAttribute('aria-pressed', String(visible));
+});
+
+async function checkSession() {
+  const response = await fetch('/api/session');
+  const result = await response.json();
+  setUser(result.user);
+  if (currentUser) await load();
+}
+
+let curK = 0, curI = 0;
+
+function render() {
+  $('#app').innerHTML = `
+    ${currentUser.role === 'admin' ? adminHTML() : ''}
+    <div class="tabs" id="khoiTabs"></div>
+    <div class="tabs" id="lopTabs"></div>
+    <div id="cards">${classes.map((k, ki) => k.lop.map((l, li) =>
+      cardHTML(k.khoi, l).replace('class="card ', `data-ki="${ki}" data-li="${li}" class="card `)).join('')).join('')}</div>
+    <div class="pager">
+      <button class="ghost" id="prev">◀ Lớp trước</button>
+      <span class="muted" id="pageInfo"></span>
+      <button class="ghost" id="next">Lớp sau ▶</button>
+    </div>`;
+  // khôi phục dữ liệu đang nhập dở
+  classes.forEach((k) => k.lop.forEach((l) => {
+    const st = (state[l.ten] ||= {});
+    Object.entries(st).forEach(([key, v]) => {
+      const row = $(`#c-${l.ten} .row[data-key="${key}"]`); if (!row) return;
+      $('.chk', row).checked = !!v.on;
+      $('.qty', row).value = v.qty; $('.qty', row).classList.toggle('hidden', !v.on);
+      const r = $('.reason', row); if (r) { r.value = v.reason; r.classList.toggle('hidden', !v.on); }
+    });
+    updateTotal(l.ten);
+  }));
+  showPage();
+}
+
+function adminHTML() {
+  return `<section class="card admin-panel">
+    <h2>Quản lý tài khoản giáo viên</h2>
+    <form class="user-form" id="userForm">
+      <label>Tên đăng nhập<input name="username" autocomplete="off" minlength="3" maxlength="32" required></label>
+      <label>Mật khẩu tạm thời (ít nhất 12 ký tự)
+        <span class="password-field">
+          <input name="password" type="password" minlength="12" required>
+          <button class="ghost password-toggle" type="button" aria-label="Hiện mật khẩu" aria-pressed="false">Hiện</button>
+        </span>
+      </label>
+      <button type="submit">Tạo tài khoản giáo viên</button>
+    </form>
+    <div class="user-list" id="userList">${users.map((user) => `
+      <div class="user-entry"><span>${esc(user.username)} <span class="muted">(${user.role === 'admin' ? 'admin' : 'giáo viên trực'})</span></span>
+      ${user.role === 'teacher' ? `<span><button class="ghost reset-user-password" data-user-id="${esc(user.id)}">Đặt lại mật khẩu</button> <button class="ghost delete-user" data-user-id="${esc(user.id)}">Xóa</button></span>` : ''}</div>
+    `).join('')}</div>
+    <h2>Quản lý lớp</h2>
+    <form class="user-form" id="classForm">
+      <label>Khối<input name="khoi" maxlength="32" placeholder="Khối 10" required></label>
+      <label>Tên lớp<input name="lop" maxlength="32" placeholder="10A1" required></label>
+      <label>Sĩ số<input name="siSo" type="number" min="1" required></label>
+      <button type="submit">Thêm lớp</button>
+    </form>
+    <div class="user-list">${classes.flatMap((group) => group.lop.map((cls) => `
+      <div class="user-entry"><span>${esc(group.khoi)} · ${esc(cls.ten)} <span class="muted">(${cls.siSo} học sinh)</span></span>
+      <button class="ghost delete-class" data-class-name="${esc(cls.ten)}">Xóa lớp</button></div>
+    `)).join('')}</div>
+  </section>`;
+}
+
+document.addEventListener('submit', async (event) => {
+  if (!['userForm', 'classForm'].includes(event.target.id)) return;
+  event.preventDefault();
+  const form = new FormData(event.target);
+  try {
+    const isClass = event.target.id === 'classForm';
+    const response = await fetch(isClass ? '/api/classes' : '/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isClass
+        ? { khoi: form.get('khoi'), lop: form.get('lop'), siSo: Number(form.get('siSo')) }
+        : { username: form.get('username'), password: form.get('password') }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Không lưu được dữ liệu');
+    await load();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.delete-user, .delete-class, .reset-user-password');
+  if (!button) return;
+  const isClass = button.classList.contains('delete-class');
+  const isReset = button.classList.contains('reset-user-password');
+  let password = null;
+  if (isReset) {
+    password = prompt('Nhập mật khẩu mới (ít nhất 12 ký tự):');
+    if (password === null) return;
+    if (password.length < 12) { alert('Mật khẩu phải có ít nhất 12 ký tự'); return; }
+  } else {
+    const message = isClass
+      ? `Xóa lớp ${button.dataset.className}? Lớp còn báo cáo lịch sử sẽ không thể xóa.`
+      : 'Xóa tài khoản giáo viên này?';
+    if (!confirm(message)) return;
+  }
+  try {
+    const url = isClass
+      ? '/api/classes/' + encodeURIComponent(button.dataset.className)
+      : '/api/users/' + encodeURIComponent(button.dataset.userId) + (isReset ? '/password' : '');
+    const response = await fetch(url, {
+      method: isReset ? 'POST' : 'DELETE',
+      ...(isReset ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) } : {}),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Không thực hiện được thao tác');
+    await load();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+function go(k, i) {
+  const n = classes[k].lop.length;
+  curK = k; curI = Math.max(0, Math.min(n - 1, i));
+  showPage();
+}
+
+function showPage() {
+  const k = classes[curK];
+  $('#khoiTabs').innerHTML = classes.map((x, i) =>
+    `<button class="tab ${i === curK ? 'on' : ''}" data-k="${i}">${esc(x.khoi)}</button>`).join('');
+  $('#lopTabs').innerHTML = k.lop.map((l, i) => {
+    const done = reports.some((r) => r.lop === l.ten);
+    return `<button class="tab ${i === curI ? 'on' : ''} ${done ? 'okTab' : ''}" data-i="${i}">${esc(l.ten)}${done ? ' ✔' : ''}</button>`;
+  }).join('');
+  document.querySelectorAll('#cards .card').forEach((c) => {
+    c.classList.toggle('hidden', !(+c.dataset.ki === curK && +c.dataset.li === curI));
+  });
+  $('#pageInfo').textContent = `Trang ${curI + 1}/${k.lop.length}`;
+  $('#prev').disabled = curI === 0;
+  $('#next').disabled = curI === k.lop.length - 1;
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t.dataset.k !== undefined && t.classList.contains('tab')) go(+t.dataset.k, 0);
+  else if (t.dataset.i !== undefined && t.classList.contains('tab')) go(curK, +t.dataset.i);
+  else if (t.id === 'prev') go(curK, curI - 1);
+  else if (t.id === 'next') go(curK, curI + 1);
+});
+
+// vuốt trái/phải trên điện thoại để lật lớp
+let sx = null;
+document.addEventListener('touchstart', (e) => { sx = e.target.closest('input, textarea') ? null : e.touches[0].clientX; }, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (sx === null) return;
+  const dx = e.changedTouches[0].clientX - sx; sx = null;
+  if (Math.abs(dx) > 80) go(curK, curI + (dx < 0 ? 1 : -1));
+});
+
+function cardHTML(khoi, l) {
+  const done = reports.find((r) => r.lop === l.ten);
+  const rows = ROWS.map(([key, label]) => `
+    <div class="row" data-key="${key}">
+      <label><input type="checkbox" class="chk"> ${label}</label>
+      <input type="number" class="qty hidden" min="0" placeholder="Số lượng">
+      ${key === 'khac' ? '<input type="text" class="reason hidden" placeholder="Ghi lý do...">' : ''}
+    </div>`).join('');
+  const doneHTML = done ? `
+    <div class="thumbs">${done.rows.map((r) => `<div class="muted"><b>${esc(r.label)}: ${r.qty}</b>${r.reason ? '<br>Lý do: ' + esc(r.reason) : ''}</div>`).join('')}</div>
+    <div class="muted">Người nộp: ${esc(done.createdBy || 'Không rõ')}</div>
+    ${currentUser.role === 'admin' ? '<button class="ghost delete-report">Xóa báo cáo</button>' : ''}` : '';
+  return `
+  <div class="card ${done ? 'done' : ''}" id="c-${l.ten}" data-lop="${l.ten}" data-khoi="${esc(khoi)}">
+    <div class="head"><b>Lớp ${esc(l.ten)}</b>
+      <span class="muted">Sĩ số: <input type="number" class="siso" min="1" value="${l.siSo}" aria-label="Chỉnh sĩ số lớp ${esc(l.ten)}" style="width:70px; font-weight:700"> ${done ? '<span class="badge">Đã nộp</span>' : ''}</span></div>
+    ${rows}
+    <div class="total red"><span>Tổng điểm danh</span><span class="sum">0 / ${l.siSo}</span></div>
+    <button class="submit" disabled>Submit</button>
+    ${doneHTML}
+  </div>`;
+}
+
+function updateTotal(lop) {
+  const card = $('#c-' + CSS.escape(lop));
+  const siSo = classes.flatMap((k) => k.lop).find((l) => l.ten === lop).siSo;
+  const st = state[lop];
+  const sum = Object.values(st).reduce((s, v) => s + (v.on ? Number(v.qty || 0) : 0), 0);
+  const ok = siSo > 0 && sum === siSo;
+  const t = $('.total', card);
+  t.className = 'total ' + (ok ? 'green' : 'red');
+  $('.sum', card).textContent = `${sum} / ${siSo}` + (ok ? ' ✔' : sum > siSo ? ' (dư)' : ' (thiếu)');
+  $('.submit', card).disabled = !ok;
+}
+
+let sisoTimer;
+document.addEventListener('input', (e) => {
+  if (e.target.classList.contains('siso')) {
+    const card = e.target.closest('.card'), lop = card.dataset.lop;
+    const cls = classes.flatMap((k) => k.lop).find((l) => l.ten === lop);
+    cls.siSo = Math.floor(Number(e.target.value)) || 0;
+    updateTotal(lop);
+    clearTimeout(sisoTimer);
+    if (cls.siSo > 0) sisoTimer = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/siso', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lop, siSo: cls.siSo }),
+        });
+        if (!response.ok) {
+          const result = await response.json();
+          alert(result.error || 'Không lưu được sĩ số');
+        }
+      } catch (error) {
+        alert(error.message || 'Không lưu được sĩ số');
+      }
+    }, 500);
+    return;
+  }
+  const row = e.target.closest('.row'); if (!row) return;
+  const card = row.closest('.card'), lop = card.dataset.lop, key = row.dataset.key;
+  const st = (state[lop][key] ||= { on: false, qty: '', reason: '' });
+  if (e.target.classList.contains('chk')) {
+    st.on = e.target.checked;
+    $('.qty', row).classList.toggle('hidden', !st.on);
+    const r = $('.reason', row); if (r) r.classList.toggle('hidden', !st.on);
+    if (st.on) $('.qty', row).focus();
+  }
+  if (e.target.classList.contains('qty')) st.qty = e.target.value;
+  if (e.target.classList.contains('reason')) st.reason = e.target.value;
+  updateTotal(lop);
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('submit')) submitClass(e.target.closest('.card'));
+});
+
+document.addEventListener('click', async (event) => {
+  if (!event.target.classList.contains('delete-report')) return;
+  const card = event.target.closest('.card');
+  if (!confirm(`Xóa báo cáo lớp ${card.dataset.lop} ngày ${$('#date').value}?`)) return;
+  try {
+    const response = await fetch(`/api/reports?date=${encodeURIComponent($('#date').value)}&lop=${encodeURIComponent(card.dataset.lop)}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Không xóa được báo cáo');
+    await load();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+// ---- Nộp điểm danh ----
+async function submitClass(card) {
+  const lop = card.dataset.lop, khoi = card.dataset.khoi;
+  const items = ROWS.map(([key, label]) => ({ key, label, ...(state[lop][key] || {}) }))
+    .filter((r) => r.on && Number(r.qty) > 0);
+  const thieu = items.find((r) => r.key === 'khac' && !(r.reason || '').trim());
+  if (thieu) { alert('Mục "Khác" chưa ghi lý do.'); return; }
+  const btn = $('.submit', card); btn.disabled = true;
+  const res = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: $('#date').value, khoi, lop,
+      rows: items.map((r) => ({ key: r.key, label: r.label, qty: Number(r.qty), reason: r.reason || '' })) }) });
+  const out = await res.json();
+  if (!res.ok) { alert(out.error); btn.disabled = false; return; }
+  await load();
+  if (curI < classes[curK].lop.length - 1) go(curK, curI + 1); // tự sang lớp kế tiếp
+}
+
+checkSession().catch((error) => {
+  $('#loginError').textContent = error.message;
+  $('#loginPanel').classList.remove('hidden');
+});
+</script>
+</body>
+</html>
