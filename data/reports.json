@@ -15,5 +15,79 @@
     ],
     "createdBy": "HoangThiLien",
     "time": "2026-10-19T17:35:28.356Z"
+  },
+  {
+    "date": "2026-10-21",
+    "khoi": "Khối 10",
+    "lop": "10A1",
+    "siSo": 40,
+    "tong": 40,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 40,
+        "reason": ""
+      }
+    ],
+    "createdBy": "admin",
+    "time": "2026-10-21T15:55:05.740Z"
+  },
+  {
+    "date": "2026-10-21",
+    "khoi": "Khối 10",
+    "lop": "10A2",
+    "siSo": 40,
+    "tong": 40,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 40,
+        "reason": ""
+      }
+    ],
+    "createdBy": "admin",
+    "time": "2026-10-21T15:55:11.482Z"
+  },
+  {
+    "date": "2026-10-21",
+    "khoi": "Khối 10",
+    "lop": "10A3",
+    "siSo": 40,
+    "tong": 40,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 40,
+        "reason": ""
+      }
+    ],
+    "createdBy": "admin",
+    "time": "2026-10-21T15:55:16.120Z"
+  },
+  {
+    "date": "2026-10-21",
+    "khoi": "Khối 10",
+    "lop": "10A4",
+    "siSo": 40,
+    "tong": 40,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 34,
+        "reason": ""
+      },
+      {
+        "key": "thuvien",
+        "label": "Học sinh thư viện",
+        "qty": 6,
+        "reason": ""
+      }
+    ],
+    "createdBy": "admin",
+    "time": "2026-10-21T15:56:14.137Z"
   }
 ]
