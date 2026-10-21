@@ -55,6 +55,8 @@
   .password-toggle { flex:none; min-width:76px; padding:6px 10px; }
   .account { display:flex; align-items:center; gap:10px; }
   .admin-panel { margin-bottom:18px; }
+  .offline-tools { margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .offline-tools #syncStatus { flex:1; min-width:220px; }
   .user-list { display:grid; gap:8px; }
   .user-entry { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
   input[type=checkbox] { accent-color:var(--pri); }
@@ -135,6 +137,7 @@
       <button>Đăng nhập</button>
       <div class="muted" id="loginError" role="alert"></div>
     </form>
+    <button class="ghost hidden" id="offlineLogin" type="button"></button>
   </section>
   <div id="app" class="hidden"></div>
 </main>
@@ -147,29 +150,157 @@ const ROWS = [
 ];
 const state = {};   // state[lop][key] = {on, qty, reason}
 let classes = [], reports = [], currentUser = null, users = [];
+let activeCache = null, offlineMode = false, offlineStorageError = false;
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const CACHE_PREFIX = 'diemdanh-offline-v1:';
+const LAST_USER_KEY = 'diemdanh-offline-last-user';
 
 $('#date').value = new Date().toISOString().slice(0, 10);
 $('#date').onchange = () => { Object.keys(state).forEach((k) => delete state[k]); load(); };
 
+function getOfflineCache(username) {
+  try {
+    const value = localStorage.getItem(CACHE_PREFIX + username);
+    return value ? JSON.parse(value) : null;
+  } catch (error) {
+    console.error('Không đọc được dữ liệu offline:', error);
+    return null;
+  }
+}
+
+function saveOfflineCache() {
+  if (!currentUser || !activeCache) return;
+  try {
+    activeCache.user = currentUser;
+    localStorage.setItem(CACHE_PREFIX + currentUser.username, JSON.stringify(activeCache));
+    localStorage.setItem(LAST_USER_KEY, currentUser.username);
+    offlineStorageError = false;
+  } catch (error) {
+    offlineStorageError = true;
+    console.error('Không lưu được dữ liệu offline:', error);
+    const status = $('#syncStatus');
+    if (status) status.textContent = 'Không lưu được dữ liệu offline trên thiết bị. Hãy kiểm tra dung lượng trình duyệt.';
+  }
+}
+
+function cachedUser() {
+  try {
+    const username = localStorage.getItem(LAST_USER_KEY);
+    if (!username) return null;
+    const cached = getOfflineCache(username);
+    return cached && cached.user ? cached : null;
+  } catch (error) {
+    console.error('Không đọc được tài khoản offline:', error);
+    return null;
+  }
+}
+
+function updateOfflineLogin() {
+  const button = $('#offlineLogin');
+  if (!button) return;
+  const cached = cachedUser();
+  button.classList.toggle('hidden', !cached);
+  if (cached) button.textContent = `Tiếp tục offline với ${cached.user.username}`;
+}
+
+function restoreDraft() {
+  const draft = activeCache && activeCache.drafts && activeCache.drafts[$('#date').value];
+  if (!draft) return;
+  Object.keys(state).forEach((key) => delete state[key]);
+  Object.assign(state, draft);
+}
+
+function saveDraft() {
+  if (!activeCache) return;
+  activeCache.drafts ||= {};
+  activeCache.drafts[$('#date').value] = state;
+  saveOfflineCache();
+}
+
+function reportsForDate(source, date) {
+  return (source || []).filter((report) => report.date === date);
+}
+
+function combineWithPending(source, pending, date) {
+  const combined = reportsForDate(source, date).slice();
+  for (const item of pending || []) {
+    if (item.date !== date) continue;
+    const report = { ...item, createdBy: item.createdBy || currentUser.username };
+    const index = combined.findIndex((entry) => entry.date === item.date && entry.lop === item.lop);
+    if (index >= 0) combined[index] = report;
+    else combined.push(report);
+  }
+  return combined;
+}
+
+function rememberReport(report) {
+  activeCache ||= { reports: [], pending: [], drafts: {} };
+  activeCache.reports = [
+    ...(activeCache.reports || []).filter((item) => !(item.date === report.date && item.lop === report.lop)),
+    report,
+  ];
+}
+
+function clearDraft(date, lop) {
+  if (activeCache && activeCache.drafts && activeCache.drafts[date]) {
+    delete activeCache.drafts[date][lop];
+    if (!Object.keys(activeCache.drafts[date]).length) delete activeCache.drafts[date];
+  }
+}
+
 async function load() {
   if (!currentUser) return;
+  const date = $('#date').value;
+  if (!navigator.onLine) {
+    if (!activeCache || !Array.isArray(activeCache.classes)) {
+      alert('Thiết bị chưa có dữ liệu lớp đã lưu. Hãy kết nối mạng và mở ứng dụng trước.');
+      return;
+    }
+    offlineMode = true;
+    classes = activeCache.classes;
+    reports = combineWithPending(activeCache.reports, activeCache.pending, date);
+    restoreDraft();
+    render();
+    return;
+  }
   try {
-    const [classRes, reportRes] = await Promise.all([
-      fetch('/api/classes'),
-      fetch('/api/reports?date=' + encodeURIComponent($('#date').value)),
-    ]);
-    if (!classRes.ok || !reportRes.ok) throw new Error('Không tải được dữ liệu điểm danh');
+    const classRes = await fetch('/api/classes');
+    if (classRes.status === 401) throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+    if (!classRes.ok) throw new Error('Không tải được danh sách lớp');
     classes = await classRes.json();
-    reports = await reportRes.json();
+    if (activeCache && activeCache.pending && activeCache.pending.length) await syncPending();
+    const reportRes = await fetch('/api/reports?date=' + encodeURIComponent(date));
+    if (reportRes.status === 401) throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+    if (!reportRes.ok) throw new Error('Không tải được báo cáo điểm danh');
+    const todaysReports = await reportRes.json();
+    activeCache ||= { reports: [], pending: [], drafts: {} };
+    activeCache.classes = classes;
+    activeCache.reports = [
+      ...reportsForDate(activeCache.reports, date),
+      ...reportsForDate(todaysReports, date),
+    ];
+    const otherDates = (activeCache.reports || []).filter((report) => report.date !== date);
+    activeCache.reports = [...otherDates, ...reportsForDate(todaysReports, date)];
+    reports = combineWithPending(todaysReports, activeCache.pending, date);
     if (currentUser.role === 'admin') {
       const usersRes = await fetch('/api/users');
       if (!usersRes.ok) throw new Error('Không tải được danh sách tài khoản');
       users = await usersRes.json();
     }
+    offlineMode = false;
+    restoreDraft();
+    saveOfflineCache();
     render();
   } catch (error) {
+    if (error.name === 'TypeError' && activeCache && activeCache.classes) {
+      offlineMode = true;
+      classes = activeCache.classes;
+      reports = combineWithPending(activeCache.reports, activeCache.pending, date);
+      restoreDraft();
+      render();
+      return;
+    }
     alert(error.message);
   }
 }
@@ -180,6 +311,7 @@ function setUser(user) {
   $('#app').classList.toggle('hidden', !user);
   $('#account').classList.toggle('hidden', !user);
   $('#accountName').textContent = user ? `${user.username} (${user.role === 'admin' ? 'admin' : 'giáo viên trực'})` : '';
+  updateOfflineLogin();
 }
 
 $('#loginForm').addEventListener('submit', async (event) => {
@@ -196,16 +328,50 @@ $('#loginForm').addEventListener('submit', async (event) => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Đăng nhập thất bại');
     loginForm.reset();
+    offlineMode = false;
     setUser(result.user);
+    activeCache = getOfflineCache(result.user.username) || { reports: [], pending: [], drafts: {} };
+    activeCache.user = result.user;
+    saveOfflineCache();
     await load();
   } catch (error) {
-    $('#loginError').textContent = error.message;
+    const username = String(form.get('username') || '').trim();
+    const cached = getOfflineCache(username);
+    if (error instanceof TypeError && cached && cached.user && Array.isArray(cached.classes)) {
+      loginForm.reset();
+      activeCache = cached;
+      offlineMode = true;
+      setUser(cached.user);
+      await load();
+    } else {
+      $('#loginError').textContent = error.message;
+    }
   }
 });
 
+$('#offlineLogin').addEventListener('click', async () => {
+  const cached = cachedUser();
+  if (!cached) return updateOfflineLogin();
+  activeCache = cached;
+  offlineMode = true;
+  setUser(cached.user);
+  await load();
+});
+
 $('#logout').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
+  if (navigator.onLine) {
+    try { await fetch('/api/logout', { method: 'POST' }); } catch (error) {
+      console.error('Không thể đăng xuất trên máy chủ:', error);
+    }
+  }
   setUser(null);
+  try { localStorage.removeItem(LAST_USER_KEY); } catch (error) {
+    console.error('Không xóa được tài khoản offline đã dùng:', error);
+  }
+  updateOfflineLogin();
+  activeCache = null;
+  offlineMode = false;
+  offlineStorageError = false;
   users = [];
   classes = [];
   reports = [];
@@ -226,15 +392,25 @@ document.addEventListener('click', (event) => {
 async function checkSession() {
   const response = await fetch('/api/session');
   const result = await response.json();
-  setUser(result.user);
-  if (currentUser) await load();
+  if (result.user) {
+    setUser(result.user);
+    activeCache = getOfflineCache(result.user.username) || { reports: [], pending: [], drafts: {} };
+    activeCache.user = result.user;
+    await load();
+  } else {
+    setUser(null);
+  }
 }
 
 let curK = 0, curI = 0;
 
 function render() {
   $('#app').innerHTML = `
-    ${currentUser.role === 'admin' ? adminHTML() : ''}
+    <section class="card offline-tools">
+      <span class="muted" id="syncStatus"></span>
+      <button class="ghost" id="exportExcel">Xuất Excel ngày ${esc($('#date').value)}</button>
+    </section>
+    ${currentUser.role === 'admin' && !offlineMode ? adminHTML() : ''}
     <div class="tabs" id="khoiTabs"></div>
     <div class="tabs" id="lopTabs"></div>
     <div id="cards">${classes.map((k, ki) => k.lop.map((l, li) =>
@@ -244,6 +420,14 @@ function render() {
       <span class="muted" id="pageInfo"></span>
       <button class="ghost" id="next">Lớp sau ▶</button>
     </div>`;
+  const pendingCount = activeCache && activeCache.pending ? activeCache.pending.length : 0;
+  $('#syncStatus').textContent = offlineStorageError
+    ? 'Không lưu được dữ liệu offline trên thiết bị. Các thay đổi chưa được lưu bền vững.'
+    : offlineMode
+    ? `Đang offline · Dữ liệu lớp/báo cáo được dùng từ lần tải gần nhất · ${pendingCount} báo cáo chờ đồng bộ${pendingCount && activeCache.pending.find((item) => item.syncError) ? ` · ${activeCache.pending.find((item) => item.syncError).syncError}` : ''}`
+    : pendingCount
+      ? `Đang online · ${pendingCount} báo cáo chờ đồng bộ${activeCache.pending.find((item) => item.syncError) ? ` · ${activeCache.pending.find((item) => item.syncError).syncError}` : ''}`
+      : 'Đang online · Dữ liệu đã đồng bộ';
   // khôi phục dữ liệu đang nhập dở
   classes.forEach((k) => k.lop.forEach((l) => {
     const st = (state[l.ten] ||= {});
@@ -392,11 +576,11 @@ function cardHTML(khoi, l) {
   const doneHTML = done ? `
     <div class="thumbs">${done.rows.map((r) => `<div class="muted"><b>${esc(r.label)}: ${r.qty}</b>${r.reason ? '<br>Lý do: ' + esc(r.reason) : ''}</div>`).join('')}</div>
     <div class="muted">Người nộp: ${esc(done.createdBy || 'Không rõ')}</div>
-    ${currentUser.role === 'admin' ? '<button class="ghost delete-report">Xóa báo cáo</button>' : ''}` : '';
+    ${currentUser.role === 'admin' && !offlineMode ? '<button class="ghost delete-report">Xóa báo cáo</button>' : ''}` : '';
   return `
   <div class="card ${done ? 'done' : ''}" id="c-${l.ten}" data-lop="${l.ten}" data-khoi="${esc(khoi)}">
     <div class="head"><b>Lớp ${esc(l.ten)}</b>
-      <span class="muted">Sĩ số: <input type="number" class="siso" min="1" value="${l.siSo}" aria-label="Chỉnh sĩ số lớp ${esc(l.ten)}" style="width:70px; font-weight:700"> ${done ? '<span class="badge">Đã nộp</span>' : ''}</span></div>
+      <span class="muted">Sĩ số: <input type="number" class="siso" min="1" value="${l.siSo}" aria-label="Chỉnh sĩ số lớp ${esc(l.ten)}" style="width:70px; font-weight:700" ${offlineMode ? 'disabled' : ''}> ${done ? `<span class="badge">${activeCache && activeCache.pending && activeCache.pending.some((p) => p.date === done.date && p.lop === done.lop) ? 'Chờ đồng bộ' : 'Đã nộp'}</span>` : ''}</span></div>
     ${rows}
     <div class="total red"><span>Tổng điểm danh</span><span class="sum">0 / ${l.siSo}</span></div>
     <button class="submit" disabled>Submit</button>
@@ -419,6 +603,7 @@ function updateTotal(lop) {
 let sisoTimer;
 document.addEventListener('input', (e) => {
   if (e.target.classList.contains('siso')) {
+    if (offlineMode) return;
     const card = e.target.closest('.card'), lop = card.dataset.lop;
     const cls = classes.flatMap((k) => k.lop).find((l) => l.ten === lop);
     cls.siSo = Math.floor(Number(e.target.value)) || 0;
@@ -451,6 +636,7 @@ document.addEventListener('input', (e) => {
   }
   if (e.target.classList.contains('qty')) st.qty = e.target.value;
   if (e.target.classList.contains('reason')) st.reason = e.target.value;
+  saveDraft();
   updateTotal(lop);
 });
 
@@ -480,18 +666,203 @@ async function submitClass(card) {
   const thieu = items.find((r) => r.key === 'khac' && !(r.reason || '').trim());
   if (thieu) { alert('Mục "Khác" chưa ghi lý do.'); return; }
   const btn = $('.submit', card); btn.disabled = true;
-  const res = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date: $('#date').value, khoi, lop,
-      rows: items.map((r) => ({ key: r.key, label: r.label, qty: Number(r.qty), reason: r.reason || '' })) }) });
-  const out = await res.json();
-  if (!res.ok) { alert(out.error); btn.disabled = false; return; }
-  await load();
-  if (curI < classes[curK].lop.length - 1) go(curK, curI + 1); // tự sang lớp kế tiếp
+  const payload = { date: $('#date').value, khoi, lop,
+    rows: items.map((r) => ({ key: r.key, label: r.label, qty: Number(r.qty), reason: r.reason || '' })) };
+  if (offlineMode || !navigator.onLine) {
+    activeCache ||= { classes, reports: [], pending: [], drafts: {} };
+    activeCache.pending ||= [];
+    activeCache.pending = activeCache.pending.filter((item) => !(item.date === payload.date && item.lop === lop));
+    activeCache.pending.push({ ...payload, siSo: classes.flatMap((group) => group.lop).find((cls) => cls.ten === lop).siSo,
+      tong: items.reduce((sum, item) => sum + Number(item.qty), 0), createdBy: currentUser.username,
+      time: new Date().toISOString(), queuedAt: Date.now() });
+    rememberReport(activeCache.pending[activeCache.pending.length - 1]);
+    delete state[lop];
+    clearDraft(payload.date, lop);
+    saveOfflineCache();
+    await load();
+  } else {
+    try {
+      const res = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) });
+      const out = await res.json();
+      if (!res.ok) { alert(out.error); btn.disabled = false; return; }
+      const cls = classes.flatMap((group) => group.lop).find((item) => item.ten === lop);
+      rememberReport({ ...payload, siSo: cls.siSo, tong: items.reduce((sum, item) => sum + Number(item.qty), 0),
+        createdBy: currentUser.username, time: new Date().toISOString() });
+      delete state[lop];
+      clearDraft(payload.date, lop);
+      saveOfflineCache();
+      await load();
+    } catch (error) {
+      btn.disabled = false;
+      if (error instanceof TypeError) {
+        offlineMode = true;
+        await submitClass(card);
+      } else {
+        alert(error.message);
+      }
+      return;
+    }
+  }
+  if (curI < classes[curK].lop.length - 1) go(curK, curI + 1);
+}
+
+async function syncPending() {
+  if (!activeCache || !Array.isArray(activeCache.pending) || !navigator.onLine) return;
+  for (const item of [...activeCache.pending]) {
+    try {
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: item.date, khoi: item.khoi, lop: item.lop, rows: item.rows }),
+      });
+      if (response.status === 401) {
+        item.syncError = 'Phiên đăng nhập hết hạn; hãy đăng nhập lại để đồng bộ.';
+        continue;
+      }
+      const result = await response.json();
+      if (!response.ok) {
+        item.syncError = result.error || 'Máy chủ từ chối báo cáo.';
+        continue;
+      }
+      activeCache.pending = activeCache.pending.filter((pending) => pending !== item);
+      item.syncError = '';
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      item.syncError = 'Chưa kết nối được máy chủ.';
+      break;
+    }
+  }
+  saveOfflineCache();
+}
+
+function excelColumn(index) {
+  let result = '';
+  for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+    result = String.fromCharCode(65 + (n - 1) % 26) + result;
+  }
+  return result;
+}
+
+function xmlEscape(value) {
+  return String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+function crc32(bytes) {
+  let crc = -1;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function zipStore(files) {
+  const encoder = new TextEncoder();
+  const localParts = [], centralParts = [];
+  let offset = 0;
+  const u16 = (view, position, value) => view.setUint16(position, value, true);
+  const u32 = (view, position, value) => view.setUint32(position, value >>> 0, true);
+  for (const [name, content] of Object.entries(files)) {
+    const nameBytes = encoder.encode(name), data = encoder.encode(content), checksum = crc32(data);
+    const local = new Uint8Array(30 + nameBytes.length), localView = new DataView(local.buffer);
+    u32(localView, 0, 0x04034B50); u16(localView, 4, 20); u16(localView, 6, 0x0800);
+    u16(localView, 8, 0); u16(localView, 12, 0x21); u32(localView, 14, checksum); u32(localView, 18, data.length);
+    u32(localView, 22, data.length); u16(localView, 26, nameBytes.length);
+    local.set(nameBytes, 30);
+    localParts.push(local, data);
+
+    const central = new Uint8Array(46 + nameBytes.length), centralView = new DataView(central.buffer);
+    u32(centralView, 0, 0x02014B50); u16(centralView, 4, 20); u16(centralView, 6, 20);
+    u16(centralView, 8, 0x0800); u16(centralView, 10, 0); u16(centralView, 14, 0x21);
+    u32(centralView, 16, checksum); u32(centralView, 20, data.length); u32(centralView, 24, data.length);
+    u16(centralView, 28, nameBytes.length); u32(centralView, 42, offset);
+    central.set(nameBytes, 46);
+    centralParts.push(central);
+    offset += local.length + data.length;
+  }
+  const centralSize = centralParts.reduce((size, part) => size + part.length, 0);
+  const end = new Uint8Array(22), endView = new DataView(end.buffer);
+  u32(endView, 0, 0x06054B50); u16(endView, 8, centralParts.length); u16(endView, 10, centralParts.length);
+  u32(endView, 12, centralSize); u32(endView, 16, offset);
+  return new Blob([...localParts, ...centralParts, end], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+function exportExcel() {
+  const date = $('#date').value;
+  const dayReports = reportsForDate(reports, date);
+  if (!dayReports.length) {
+    alert('Ngày đang chọn chưa có báo cáo đã tải hoặc đã lưu trên thiết bị.');
+    return;
+  }
+  const headers = ['Ngày', 'Khối', 'Lớp', 'Sĩ số', 'Tổng', 'Phân loại', 'Số lượng', 'Lý do', 'Người nộp', 'Thời gian'];
+  const rows = [headers];
+  for (const report of dayReports) {
+    for (const item of report.rows || []) {
+      rows.push([report.date, report.khoi, report.lop, report.siSo, report.tong, item.label, item.qty,
+        item.reason || '', report.createdBy || '', report.time || '']);
+    }
+  }
+  const sheetRows = rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => {
+    const ref = `${excelColumn(columnIndex)}${rowIndex + 1}`;
+    if (typeof value === 'number' && Number.isFinite(value)) return `<c r="${ref}"><v>${value}</v></c>`;
+    return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
+  }).join('')}</row>`).join('');
+  const files = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Điểm danh" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    'xl/worksheets/sheet1.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`,
+  };
+  const blob = zipStore(files);
+  const link = document.createElement('a');
+  link.download = `diem-danh-${date}.xlsx`;
+  if (window.AndroidFileDownload && typeof window.AndroidFileDownload.saveFile === 'function') {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      const separator = dataUrl.indexOf(',');
+      if (separator < 0) {
+        alert('Không tạo được dữ liệu file Excel.');
+        return;
+      }
+      window.AndroidFileDownload.saveFile(link.download, dataUrl.slice(separator + 1));
+    };
+    reader.onerror = () => alert('Không đọc được file Excel vừa tạo.');
+    reader.readAsDataURL(blob);
+    return;
+  }
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+document.addEventListener('click', (event) => {
+  if (event.target.id === 'exportExcel') exportExcel();
+});
+
+window.addEventListener('online', () => {
+  if (currentUser) load();
+});
+window.addEventListener('offline', () => {
+  if (currentUser) load();
+});
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('/service-worker.js').catch((error) => {
+    console.error('Không đăng ký được service worker:', error);
+  });
 }
 
 checkSession().catch((error) => {
   $('#loginError').textContent = error.message;
   $('#loginPanel').classList.remove('hidden');
+  updateOfflineLogin();
 });
 </script>
 </body>
