@@ -1,9 +1,0 @@
-[
-  {
-    "id": "a0d66d83-7e5a-4868-8220-8af8b7bd1f90",
-    "username": "admin",
-    "role": "admin",
-    "salt": "5dab75c7875a6c9cf89c5f3e8f984f31",
-    "hash": "9761e9b90f04cb1c33b5609ce70abfc0dab1a370e7d11897c3a3d31d2a3b73c3fc0b47118b18e5b2d2f88b1c334d4710078465f6ec4d666fd35c9525c89b97ee"
-  }
-]
