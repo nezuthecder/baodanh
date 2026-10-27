@@ -89,5 +89,45 @@
     ],
     "createdBy": "admin",
     "time": "2026-10-21T15:56:14.137Z"
+  },
+  {
+    "date": "2026-10-22",
+    "khoi": "Khối 10",
+    "lop": "10A1",
+    "siSo": 40,
+    "tong": 36,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 36,
+        "reason": ""
+      }
+    ],
+    "createdBy": "admin",
+    "time": "2026-10-25T03:07:41.552Z"
+  },
+  {
+    "date": "2026-10-25",
+    "khoi": "Khối 10",
+    "lop": "10A1",
+    "siSo": 40,
+    "tong": 40,
+    "rows": [
+      {
+        "key": "lop",
+        "label": "Học sinh trên lớp",
+        "qty": 35,
+        "reason": ""
+      },
+      {
+        "key": "thuvien",
+        "label": "Học sinh thư viện",
+        "qty": 5,
+        "reason": ""
+      }
+    ],
+    "createdBy": "admin",
+    "time": "2026-10-25T03:37:49.510Z"
   }
 ]
