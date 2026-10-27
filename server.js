@@ -373,8 +373,8 @@ const server = http.createServer(async (req, res) => {
       if (saved.some((row) => !Number.isInteger(row.qty) || row.qty < 0)) {
         return send(res, 400, { error: 'Số lượng không hợp lệ' });
       }
+      if (!saved.length) return send(res, 400, { error: 'Cần ít nhất một mục điểm danh' });
       const tong = saved.reduce((sum, row) => sum + row.qty, 0);
-      if (tong !== cls.siSo) return send(res, 400, { error: `Tổng ${tong} khác sĩ số ${cls.siSo}` });
       const reports = readJSON(REPORTS_FILE);
       const existing = reports.find((report) => report.date === date && report.lop === lop);
       if (existing && existing.createdBy && existing.createdBy !== user.username && user.role !== 'admin') {
