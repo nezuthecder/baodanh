@@ -30,6 +30,7 @@
   .total { margin-top:10px; padding:8px 10px; border-radius:8px; font-weight:600; display:flex; justify-content:space-between; }
   .total.red { background:rgba(217,45,32,.12); color:var(--bad); }
   .total.green { background:rgba(18,161,80,.14); color:var(--ok); }
+  .total.neutral { background:rgba(40,88,214,.1); }
   button { font:inherit; border:0; border-radius:8px; padding:9px 14px; cursor:pointer; background:var(--pri); color:#fff; font-weight:600; }
   button:disabled { opacity:.45; cursor:not-allowed; }
   button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
@@ -44,6 +45,11 @@
   .tab { background:var(--card); color:var(--text); border:1px solid var(--line); padding:8px 14px; }
   .tab.on { background:var(--pri); color:#fff; border-color:var(--pri); }
   .tab.okTab:not(.on) { border-color:var(--ok); color:var(--ok); }
+  .tab.errorTab:not(.on) { border-color:var(--bad); color:var(--bad); }
+  .tab.errorTab.on { background:var(--bad); border-color:var(--bad); }
+  .status-mark.error { color:var(--bad); }
+  .tab.errorTab.on .status-mark.error { color:#fff; }
+  .status-mark.ok { color:var(--ok); }
   .pager { max-width:640px; margin:14px auto; display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .badge { font-size:12px; padding:2px 8px; border-radius:99px; background:rgba(18,161,80,.15); color:var(--ok); }
   .auth { max-width:420px; margin:40px auto; }
@@ -55,6 +61,8 @@
   .password-toggle { flex:none; min-width:76px; padding:6px 10px; }
   .account { display:flex; align-items:center; gap:10px; }
   .admin-panel { margin-bottom:18px; }
+  .section-nav { justify-content:flex-start; margin:0 0 14px; }
+  .app-section { margin-bottom:18px; }
   .offline-tools { margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .offline-tools #syncStatus { flex:1; min-width:220px; }
   .user-list { display:grid; gap:8px; }
@@ -112,6 +120,122 @@
     .pager { flex-wrap:wrap; }
     .pager .muted { order:-1; width:100%; }
   }
+  :root {
+    --bg:#f3f6fb; --card:#fff; --text:#182338; --muted:#718096; --line:#e3eaf3;
+    --ok:#138a59; --bad:#d04b47; --pri:#4169e1; --accent:#0f9b8e;
+    --shadow:0 12px 30px rgba(32,55,95,.07);
+  }
+  @media (prefers-color-scheme:dark) {
+    :root {
+      --bg:#101722; --card:#182231; --text:#edf3fc; --muted:#9aa9bd; --line:#2a394c;
+      --ok:#4dcc94; --bad:#ff7772; --pri:#88a5ff; --accent:#52d3c4;
+      --shadow:0 12px 30px rgba(0,0,0,.16);
+    }
+  }
+  body {
+    background:
+      radial-gradient(ellipse at 8% 0%, rgba(65,105,225,.09), transparent 34rem),
+      var(--bg);
+    padding:24px;
+  }
+  header { margin-bottom:22px; }
+  header h1 { font-size:clamp(21px, 3vw, 27px); letter-spacing:-.04em; }
+  main { max-width:1100px; }
+  h2 { letter-spacing:-.025em; }
+  .card { border-radius:16px; padding:18px; box-shadow:var(--shadow); }
+  .auth { margin:64px auto; }
+  .auth h2 { border:0; padding:0; }
+  .auth form label, .user-form label { display:grid; gap:6px; color:var(--muted); font-size:13px; font-weight:600; }
+  input[type=number], input[type=text], input[type=date],
+  .auth input, .user-form input {
+    min-height:42px; border-color:var(--line); border-radius:10px; transition:border-color .16s, box-shadow .16s;
+  }
+  input:focus-visible { border-color:var(--pri); }
+  button { border-radius:10px; box-shadow:0 3px 8px rgba(36,73,165,.12); transition:transform .16s, box-shadow .16s, background .16s; }
+  button:not(:disabled):hover { transform:translateY(-1px); box-shadow:0 7px 16px rgba(36,73,165,.18); }
+  button.ghost { box-shadow:none; }
+  button.ghost:not(:disabled):hover { background:rgba(65,105,225,.08); box-shadow:none; }
+  .offline-tools { border-radius:12px; box-shadow:none; }
+  .section-nav { justify-content:flex-start; margin:0 0 18px; }
+  .section-nav .tab { background:transparent; }
+  .section-nav .tab.on { background:var(--pri); }
+  .attendance-overview { margin-bottom:14px; padding:22px; overflow:hidden; position:relative; }
+  .attendance-overview:after {
+    content:""; position:absolute; width:190px; height:190px; right:-70px; top:-95px;
+    border-radius:50%; background:rgba(65,105,225,.08); pointer-events:none;
+  }
+  .overview-top { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
+  .eyebrow { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.12em; }
+  .attendance-overview h2 { margin:5px 0 3px; border:0; padding:0; font-size:24px; }
+  .overview-caption { margin:0; color:var(--muted); font-size:14px; }
+  .overview-date { flex:none; padding:7px 11px; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:12px; font-weight:700; }
+  .stat-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:20px; }
+  .stat-card { min-width:0; padding:13px 14px; background:color-mix(in srgb, var(--bg) 62%, var(--card)); border:1px solid var(--line); border-radius:12px; }
+  .stat-label { display:block; color:var(--muted); font-size:12px; font-weight:600; }
+  .stat-value { display:block; margin-top:3px; font-size:24px; line-height:1.2; font-weight:800; letter-spacing:-.04em; }
+  .stat-card.complete .stat-value { color:var(--ok); }
+  .stat-card.remaining .stat-value { color:var(--pri); }
+  .progress-track { height:5px; margin-top:14px; overflow:hidden; border-radius:99px; background:var(--line); }
+  .progress-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--pri), var(--accent)); transition:width .25s ease; }
+  #cards { max-width:680px; }
+  #cards .card { border-radius:16px; padding:18px; }
+  #cards .card.done { border-color:color-mix(in srgb, var(--ok) 55%, var(--line)); }
+  .head { margin-bottom:14px; }
+  .head b { font-size:20px; letter-spacing:-.03em; }
+  .head > .muted { display:flex; align-items:center; gap:6px; }
+  .siso { border-radius:8px !important; }
+  .row { padding:11px 0; }
+  .row label { font-size:14px; font-weight:550; }
+  .row input[type=checkbox] { width:17px; height:17px; }
+  .row input[type=number], .row input[type=text] { background:var(--card); }
+  .total { margin-top:14px; padding:11px 12px; border-radius:10px; }
+  .submit { margin-top:12px; min-height:46px; }
+  .badge { padding:4px 9px; font-weight:700; }
+  .class-state { display:inline-block; padding:4px 9px; border-radius:99px; background:rgba(112,128,150,.12); color:var(--muted); font-size:11px; font-weight:700; }
+  .class-state.submitted { background:rgba(19,138,89,.12); color:var(--ok); }
+  .stat-label { display:flex; align-items:center; gap:8px; }
+  .stat-icon, .row-icon, .report-icon {
+    display:inline-grid; flex:none; place-items:center; border-radius:10px;
+  }
+  .stat-icon { width:32px; height:32px; font-size:17px; }
+  .row-icon { width:30px; height:30px; font-size:16px; }
+  .report-icon { width:25px; height:25px; margin-right:6px; font-size:14px; vertical-align:middle; }
+  .icon-lop { background:#e7edff; }
+  .icon-thuvien { background:#fff0ca; }
+  .icon-on { background:#e9e1ff; }
+  .icon-ktx { background:#dff6e8; }
+  .icon-ngoai { background:#ffe3d8; }
+  .icon-ve { background:#dff3ff; }
+  .icon-khac { background:#ffe1ec; }
+  .stat-icon.classes-icon { background:#e7edff; }
+  .stat-icon.students-icon { background:#dff3ff; }
+  .stat-icon.complete-icon { background:#dff6e8; }
+  .stat-icon.pending-icon { background:#fff0ca; }
+  @media (prefers-color-scheme:dark) {
+    .icon-lop, .stat-icon.classes-icon { background:#29375d; }
+    .icon-thuvien, .stat-icon.pending-icon { background:#514324; }
+    .icon-on { background:#3a3158; }
+    .icon-ktx, .stat-icon.complete-icon { background:#214636; }
+    .icon-ngoai { background:#50372f; }
+    .icon-ve, .stat-icon.students-icon { background:#244355; }
+    .icon-khac { background:#512f40; }
+  }
+  .pager { margin-top:16px; }
+  @media (max-width:700px) {
+    body { padding:16px; }
+    header { margin-bottom:14px; }
+    .attendance-overview { padding:18px; }
+    .stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:16px; }
+    .stat-card { padding:11px 12px; }
+    .stat-value { font-size:22px; }
+    #cards .card { padding:14px; }
+  }
+  @media (max-width:400px) {
+    .overview-top { flex-wrap:wrap; }
+    .attendance-overview h2 { font-size:21px; }
+    .head { flex-wrap:wrap; }
+    .head > .muted { width:100%; justify-content:flex-start; }
+  }
 </style>
 </head>
 <body>
@@ -148,16 +272,20 @@ const ROWS = [
   ['lop', 'Học sinh trên lớp'], ['thuvien', 'Học sinh thư viện'], ['on', 'Học sinh đi ôn'],
   ['ktx', 'Học sinh dưới KTX giáo viên'], ['ngoai', 'Học sinh ra ngoài'], ['ve', 'Học sinh về'], ['khac', 'Khác'],
 ];
+const ROW_ICONS = {
+  lop: '🏫', thuvien: '📚', on: '✏️', ktx: '🏠', ngoai: '🚶', ve: '🏡', khac: '💬',
+};
 const state = {};   // state[lop][key] = {on, qty, reason}
 let classes = [], reports = [], currentUser = null, users = [];
 let activeCache = null, offlineMode = false, offlineStorageError = false;
+let activeSection = 'attendance';
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const CACHE_PREFIX = 'diemdanh-offline-v1:';
 const LAST_USER_KEY = 'diemdanh-offline-last-user';
 
 $('#date').value = new Date().toISOString().slice(0, 10);
-$('#date').onchange = () => { Object.keys(state).forEach((k) => delete state[k]); load(); };
+$('#date').onchange = () => { saveDraft(); Object.keys(state).forEach((k) => delete state[k]); load(); };
 
 function getOfflineCache(username) {
   try {
@@ -314,6 +442,12 @@ function setUser(user) {
   updateOfflineLogin();
 }
 
+function persistAndroidSession() {
+  if (window.AndroidSession && typeof window.AndroidSession.persistSession === 'function') {
+    window.AndroidSession.persistSession();
+  }
+}
+
 $('#loginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   $('#loginError').textContent = '';
@@ -327,6 +461,7 @@ $('#loginForm').addEventListener('submit', async (event) => {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Đăng nhập thất bại');
+    persistAndroidSession();
     loginForm.reset();
     offlineMode = false;
     setUser(result.user);
@@ -360,9 +495,15 @@ $('#offlineLogin').addEventListener('click', async () => {
 
 $('#logout').addEventListener('click', async () => {
   if (navigator.onLine) {
-    try { await fetch('/api/logout', { method: 'POST' }); } catch (error) {
+    try {
+      const response = await fetch('/api/logout', { method: 'POST' });
+      if (!response.ok) console.error('Máy chủ không xác nhận đăng xuất.');
+    } catch (error) {
       console.error('Không thể đăng xuất trên máy chủ:', error);
     }
+  }
+  if (window.AndroidSession && typeof window.AndroidSession.clearSession === 'function') {
+    window.AndroidSession.clearSession();
   }
   setUser(null);
   try { localStorage.removeItem(LAST_USER_KEY); } catch (error) {
@@ -394,6 +535,7 @@ async function checkSession() {
   const result = await response.json();
   if (result.user) {
     setUser(result.user);
+    persistAndroidSession();
     activeCache = getOfflineCache(result.user.username) || { reports: [], pending: [], drafts: {} };
     activeCache.user = result.user;
     await load();
@@ -405,21 +547,36 @@ async function checkSession() {
 let curK = 0, curI = 0;
 
 function render() {
+  if (currentUser.role !== 'admin' || offlineMode) activeSection = 'attendance';
   $('#app').innerHTML = `
     <section class="card offline-tools">
       <span class="muted" id="syncStatus"></span>
-      <button class="ghost" id="exportExcel">Xuất Excel ngày ${esc($('#date').value)}</button>
     </section>
-    ${currentUser.role === 'admin' && !offlineMode ? adminHTML() : ''}
-    <div class="tabs" id="khoiTabs"></div>
-    <div class="tabs" id="lopTabs"></div>
-    <div id="cards">${classes.map((k, ki) => k.lop.map((l, li) =>
-      cardHTML(k.khoi, l).replace('class="card ', `data-ki="${ki}" data-li="${li}" class="card `)).join('')).join('')}</div>
-    <div class="pager">
-      <button class="ghost" id="prev">◀ Lớp trước</button>
-      <span class="muted" id="pageInfo"></span>
-      <button class="ghost" id="next">Lớp sau ▶</button>
-    </div>`;
+    ${currentUser.role === 'admin' && !offlineMode ? `
+      <nav class="tabs section-nav" aria-label="Các mục quản lý">
+        <button class="tab section-tab" data-section="classes">Lớp</button>
+        <button class="tab section-tab" data-section="teachers">Giáo viên</button>
+        <button class="tab section-tab" data-section="attendance">Báo danh</button>
+      </nav>
+      <section class="app-section hidden" id="classesSection">${classManagementHTML()}</section>
+      <section class="app-section hidden" id="teachersSection">${teacherManagementHTML()}</section>
+    ` : ''}
+    <section class="app-section" id="attendanceSection">
+      ${attendanceOverviewHTML()}
+      <section class="card offline-tools">
+        <span class="muted">${offlineMode ? 'Đang làm việc offline · Nháp tự lưu trên thiết bị' : 'Nháp tự lưu trên thiết bị'}</span>
+        <button class="ghost" id="exportExcel">Xuất Excel</button>
+      </section>
+      <div class="tabs" id="khoiTabs"></div>
+      <div class="tabs" id="lopTabs"></div>
+      <div id="cards">${classes.map((k, ki) => k.lop.map((l, li) =>
+        cardHTML(k.khoi, l).replace('class="card ', `data-ki="${ki}" data-li="${li}" class="card `)).join('')).join('')}</div>
+      <div class="pager">
+        <button class="ghost" id="prev">◀ Lớp trước</button>
+        <span class="muted" id="pageInfo"></span>
+        <button class="ghost" id="next">Lớp sau ▶</button>
+      </div>
+    </section>`;
   const pendingCount = activeCache && activeCache.pending ? activeCache.pending.length : 0;
   $('#syncStatus').textContent = offlineStorageError
     ? 'Không lưu được dữ liệu offline trên thiết bị. Các thay đổi chưa được lưu bền vững.'
@@ -439,10 +596,53 @@ function render() {
     });
     updateTotal(l.ten);
   }));
+  showSection();
   showPage();
 }
 
-function adminHTML() {
+function attendanceOverviewHTML() {
+  const allClasses = classes.flatMap((group) => group.lop);
+  const reportedCount = allClasses.filter((cls) => reports.some((report) => report.lop === cls.ten)).length;
+  const studentCount = allClasses.reduce((total, cls) => total + (Number(cls.siSo) || 0), 0);
+  const completion = allClasses.length ? Math.round(reportedCount / allClasses.length * 100) : 0;
+  return `<section class="card attendance-overview">
+    <div class="overview-top">
+      <div>
+        <span class="eyebrow">TỔNG QUAN TRONG NGÀY</span>
+        <h2>Điểm danh hôm nay</h2>
+        <p class="overview-caption">Theo dõi tiến độ báo danh của các lớp trong ngày.</p>
+      </div>
+      <span class="overview-date">${esc($('#date').value)}</span>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><span class="stat-label"><span class="stat-icon classes-icon" aria-hidden="true">🏫</span>Tổng số lớp</span><strong class="stat-value">${allClasses.length}</strong></div>
+      <div class="stat-card"><span class="stat-label"><span class="stat-icon students-icon" aria-hidden="true">👩‍🎓</span>Tổng sĩ số</span><strong class="stat-value">${studentCount}</strong></div>
+      <div class="stat-card complete"><span class="stat-label"><span class="stat-icon complete-icon" aria-hidden="true">✅</span>Đã báo danh</span><strong class="stat-value">${reportedCount}</strong></div>
+      <div class="stat-card remaining"><span class="stat-label"><span class="stat-icon pending-icon" aria-hidden="true">⏳</span>Chưa báo danh</span><strong class="stat-value">${allClasses.length - reportedCount}</strong></div>
+    </div>
+    <div class="progress-track" role="progressbar" aria-label="Tiến độ báo danh" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${completion}">
+      <div class="progress-fill" style="width:${completion}%"></div>
+    </div>
+  </section>`;
+}
+
+function classManagementHTML() {
+  return `<section class="card admin-panel">
+    <h2>Quản lý lớp</h2>
+    <form class="user-form" id="classForm">
+      <label>Khối<input name="khoi" maxlength="32" placeholder="Khối 10" required></label>
+      <label>Tên lớp<input name="lop" maxlength="32" placeholder="10A1" required></label>
+      <label>Sĩ số<input name="siSo" type="number" min="1" required></label>
+      <button type="submit">Thêm lớp</button>
+    </form>
+    <div class="user-list">${classes.flatMap((group) => group.lop.map((cls) => `
+      <div class="user-entry"><span>${esc(group.khoi)} · ${esc(cls.ten)} <span class="muted">(${cls.siSo} học sinh)</span></span>
+      <button class="ghost delete-class" data-class-name="${esc(cls.ten)}">Xóa lớp</button></div>
+    `)).join('')}</div>
+  </section>`;
+}
+
+function teacherManagementHTML() {
   return `<section class="card admin-panel">
     <h2>Quản lý tài khoản giáo viên</h2>
     <form class="user-form" id="userForm">
@@ -459,18 +659,23 @@ function adminHTML() {
       <div class="user-entry"><span>${esc(user.username)} <span class="muted">(${user.role === 'admin' ? 'admin' : 'giáo viên trực'})</span></span>
       ${user.role === 'teacher' ? `<span><button class="ghost reset-user-password" data-user-id="${esc(user.id)}">Đặt lại mật khẩu</button> <button class="ghost delete-user" data-user-id="${esc(user.id)}">Xóa</button></span>` : ''}</div>
     `).join('')}</div>
-    <h2>Quản lý lớp</h2>
-    <form class="user-form" id="classForm">
-      <label>Khối<input name="khoi" maxlength="32" placeholder="Khối 10" required></label>
-      <label>Tên lớp<input name="lop" maxlength="32" placeholder="10A1" required></label>
-      <label>Sĩ số<input name="siSo" type="number" min="1" required></label>
-      <button type="submit">Thêm lớp</button>
-    </form>
-    <div class="user-list">${classes.flatMap((group) => group.lop.map((cls) => `
-      <div class="user-entry"><span>${esc(group.khoi)} · ${esc(cls.ten)} <span class="muted">(${cls.siSo} học sinh)</span></span>
-      <button class="ghost delete-class" data-class-name="${esc(cls.ten)}">Xóa lớp</button></div>
-    `)).join('')}</div>
   </section>`;
+}
+
+function showSection() {
+  const sections = {
+    classes: $('#classesSection'),
+    teachers: $('#teachersSection'),
+    attendance: $('#attendanceSection'),
+  };
+  Object.entries(sections).forEach(([name, section]) => {
+    if (section) section.classList.toggle('hidden', name !== activeSection);
+  });
+  document.querySelectorAll('.section-tab').forEach((button) => {
+    const selected = button.dataset.section === activeSection;
+    button.classList.toggle('on', selected);
+    button.setAttribute('aria-current', selected ? 'page' : 'false');
+  });
 }
 
 document.addEventListener('submit', async (event) => {
@@ -528,6 +733,7 @@ document.addEventListener('click', async (event) => {
 
 function go(k, i) {
   const n = classes[k].lop.length;
+  saveDraft();
   curK = k; curI = Math.max(0, Math.min(n - 1, i));
   showPage();
 }
@@ -537,8 +743,18 @@ function showPage() {
   $('#khoiTabs').innerHTML = classes.map((x, i) =>
     `<button class="tab ${i === curK ? 'on' : ''}" data-k="${i}">${esc(x.khoi)}</button>`).join('');
   $('#lopTabs').innerHTML = k.lop.map((l, i) => {
-    const done = reports.some((r) => r.lop === l.ten);
-    return `<button class="tab ${i === curI ? 'on' : ''} ${done ? 'okTab' : ''}" data-i="${i}">${esc(l.ten)}${done ? ' ✔' : ''}</button>`;
+    const draftRows = Object.values(state[l.ten] || {}).filter((row) => row.on);
+    const report = reports.find((r) => r.lop === l.ten);
+    const hasDraft = draftRows.length > 0;
+    const sum = hasDraft
+      ? draftRows.reduce((total, row) => total + (Number(row.qty) || 0), 0)
+      : report ? Number(report.tong) || 0 : null;
+    const matches = sum !== null && sum === l.siSo;
+    const status = sum === null ? '' : matches
+      ? '<span class="status-mark ok"> ✔</span>'
+      : '<span class="status-mark error"> ✕</span>';
+    const statusClass = sum === null ? '' : matches ? 'okTab' : 'errorTab';
+    return `<button class="tab ${i === curI ? 'on' : ''} ${statusClass}" data-i="${i}">${esc(l.ten)}${status}</button>`;
   }).join('');
   document.querySelectorAll('#cards .card').forEach((c) => {
     c.classList.toggle('hidden', !(+c.dataset.ki === curK && +c.dataset.li === curI));
@@ -550,7 +766,10 @@ function showPage() {
 
 document.addEventListener('click', (e) => {
   const t = e.target;
-  if (t.dataset.k !== undefined && t.classList.contains('tab')) go(+t.dataset.k, 0);
+  if (t.classList.contains('section-tab')) {
+    activeSection = t.dataset.section;
+    showSection();
+  } else if (t.dataset.k !== undefined && t.classList.contains('tab')) go(+t.dataset.k, 0);
   else if (t.dataset.i !== undefined && t.classList.contains('tab')) go(curK, +t.dataset.i);
   else if (t.id === 'prev') go(curK, curI - 1);
   else if (t.id === 'next') go(curK, curI + 1);
@@ -569,18 +788,20 @@ function cardHTML(khoi, l) {
   const done = reports.find((r) => r.lop === l.ten);
   const rows = ROWS.map(([key, label]) => `
     <div class="row" data-key="${key}">
-      <label><input type="checkbox" class="chk"> ${label}</label>
-      <input type="number" class="qty hidden" min="0" placeholder="Số lượng">
+      <label><input type="checkbox" class="chk"><span class="row-icon icon-${key}" aria-hidden="true">${ROW_ICONS[key]}</span><span>${label}</span></label>
+      <input type="number" class="qty hidden" min="0" step="1" placeholder="Số lượng">
       ${key === 'khac' ? '<input type="text" class="reason hidden" placeholder="Ghi lý do...">' : ''}
     </div>`).join('');
   const doneHTML = done ? `
-    <div class="thumbs">${done.rows.map((r) => `<div class="muted"><b>${esc(r.label)}: ${r.qty}</b>${r.reason ? '<br>Lý do: ' + esc(r.reason) : ''}</div>`).join('')}</div>
+    <div class="thumbs">${done.rows.map((r) => `<div class="muted"><span class="report-icon icon-${esc(r.key)}" aria-hidden="true">${ROW_ICONS[r.key] || '📌'}</span><b>${esc(r.label)}: ${r.qty}</b>${r.reason ? '<br>Lý do: ' + esc(r.reason) : ''}</div>`).join('')}</div>
     <div class="muted">Người nộp: ${esc(done.createdBy || 'Không rõ')}</div>
     ${currentUser.role === 'admin' && !offlineMode ? '<button class="ghost delete-report">Xóa báo cáo</button>' : ''}` : '';
+  const pending = done && activeCache && activeCache.pending && activeCache.pending.some((item) => item.date === done.date && item.lop === done.lop);
   return `
   <div class="card ${done ? 'done' : ''}" id="c-${l.ten}" data-lop="${l.ten}" data-khoi="${esc(khoi)}">
     <div class="head"><b>Lớp ${esc(l.ten)}</b>
-      <span class="muted">Sĩ số: <input type="number" class="siso" min="1" value="${l.siSo}" aria-label="Chỉnh sĩ số lớp ${esc(l.ten)}" style="width:70px; font-weight:700" ${offlineMode ? 'disabled' : ''}> ${done ? `<span class="badge">${activeCache && activeCache.pending && activeCache.pending.some((p) => p.date === done.date && p.lop === done.lop) ? 'Chờ đồng bộ' : 'Đã nộp'}</span>` : ''}</span></div>
+      <span class="muted">Sĩ số: <input type="number" class="siso" min="1" value="${l.siSo}" aria-label="Chỉnh sĩ số lớp ${esc(l.ten)}" style="width:70px; font-weight:700" ${offlineMode ? 'disabled' : ''}>
+      <span class="class-state ${done && !pending ? 'submitted' : ''}">${done ? pending ? 'Chờ đồng bộ' : 'Đã nộp' : 'Chưa nộp'}</span></span></div>
     ${rows}
     <div class="total red"><span>Tổng điểm danh</span><span class="sum">0 / ${l.siSo}</span></div>
     <button class="submit" disabled>Submit</button>
@@ -593,11 +814,17 @@ function updateTotal(lop) {
   const siSo = classes.flatMap((k) => k.lop).find((l) => l.ten === lop).siSo;
   const st = state[lop];
   const sum = Object.values(st).reduce((s, v) => s + (v.on ? Number(v.qty || 0) : 0), 0);
-  const ok = siSo > 0 && sum === siSo;
+  const selected = Object.values(st).filter((v) => v.on);
+  const report = reports.find((item) => item.lop === lop);
+  const hasDraft = selected.length > 0;
+  const displaySum = hasDraft ? sum : report ? Number(report.tong) || 0 : sum;
+  const matches = siSo > 0 && displaySum === siSo;
+  const canSubmit = selected.length > 0 && selected.every((v) =>
+    String(v.qty).trim() !== '' && Number.isInteger(Number(v.qty)) && Number(v.qty) >= 0);
   const t = $('.total', card);
-  t.className = 'total ' + (ok ? 'green' : 'red');
-  $('.sum', card).textContent = `${sum} / ${siSo}` + (ok ? ' ✔' : sum > siSo ? ' (dư)' : ' (thiếu)');
-  $('.submit', card).disabled = !ok;
+  t.className = 'total ' + (matches ? 'green' : hasDraft || report ? 'red' : 'neutral');
+  $('.sum', card).textContent = `${displaySum} / ${siSo}` + (matches ? ' ✔' : hasDraft || report ? ' ✕' : '');
+  $('.submit', card).disabled = !canSubmit;
 }
 
 let sisoTimer;
@@ -608,6 +835,7 @@ document.addEventListener('input', (e) => {
     const cls = classes.flatMap((k) => k.lop).find((l) => l.ten === lop);
     cls.siSo = Math.floor(Number(e.target.value)) || 0;
     updateTotal(lop);
+    showPage();
     clearTimeout(sisoTimer);
     if (cls.siSo > 0) sisoTimer = setTimeout(async () => {
       try {
@@ -638,6 +866,7 @@ document.addEventListener('input', (e) => {
   if (e.target.classList.contains('reason')) st.reason = e.target.value;
   saveDraft();
   updateTotal(lop);
+  showPage();
 });
 
 document.addEventListener('click', (e) => {
@@ -662,8 +891,12 @@ document.addEventListener('click', async (event) => {
 async function submitClass(card) {
   const lop = card.dataset.lop, khoi = card.dataset.khoi;
   const items = ROWS.map(([key, label]) => ({ key, label, ...(state[lop][key] || {}) }))
-    .filter((r) => r.on && Number(r.qty) > 0);
-  const thieu = items.find((r) => r.key === 'khac' && !(r.reason || '').trim());
+    .filter((r) => r.on && String(r.qty).trim() !== '');
+  if (!items.length || items.some((r) => !Number.isInteger(Number(r.qty)) || Number(r.qty) < 0)) {
+    alert('Hãy chọn ít nhất một mục và nhập số nguyên không âm.');
+    return;
+  }
+  const thieu = items.find((r) => r.key === 'khac' && Number(r.qty) > 0 && !(r.reason || '').trim());
   if (thieu) { alert('Mục "Khác" chưa ghi lý do.'); return; }
   const btn = $('.submit', card); btn.disabled = true;
   const payload = { date: $('#date').value, khoi, lop,
@@ -799,13 +1032,26 @@ function exportExcel() {
     alert('Ngày đang chọn chưa có báo cáo đã tải hoặc đã lưu trên thiết bị.');
     return;
   }
-  const headers = ['Ngày', 'Khối', 'Lớp', 'Sĩ số', 'Tổng', 'Phân loại', 'Số lượng', 'Lý do', 'Người nộp', 'Thời gian'];
+  const headers = [
+    'Ngày', 'Khối', 'Lớp', 'Sĩ số', 'Tổng',
+    ...ROWS.map(([, label]) => label),
+    'Lý do khác', 'Người nộp', 'Thời gian',
+  ];
   const rows = [headers];
   for (const report of dayReports) {
+    const quantities = new Map(ROWS.map(([key]) => [key, 0]));
+    let reason = '';
     for (const item of report.rows || []) {
-      rows.push([report.date, report.khoi, report.lop, report.siSo, report.tong, item.label, item.qty,
-        item.reason || '', report.createdBy || '', report.time || '']);
+      if (quantities.has(item.key)) {
+        quantities.set(item.key, quantities.get(item.key) + (Number(item.qty) || 0));
+      }
+      if (item.key === 'khac' && item.reason) reason = item.reason;
     }
+    rows.push([
+      report.date, report.khoi, report.lop, report.siSo, report.tong,
+      ...ROWS.map(([key]) => quantities.get(key)),
+      reason, report.createdBy || '', report.time || '',
+    ]);
   }
   const sheetRows = rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => {
     const ref = `${excelColumn(columnIndex)}${rowIndex + 1}`;
